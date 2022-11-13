@@ -1,7 +1,6 @@
 #Creat a VPC
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr_block
-
   tags = {
     "Name" = "Main VPC"
   }
@@ -9,7 +8,7 @@ resource "aws_vpc" "main" {
 }
 
 #Create a subnet
-resource "aws_subnet" "web" {
+resource "aws_subnet" "web_sn" {
   vpc_id = aws_vpc.main.id
   cidr_block = var.web_subnet
   availability_zone = var.availability_zone[1]
@@ -17,6 +16,30 @@ resource "aws_subnet" "web" {
     "Name" = "Web Subnet"
   }
 }
+
+resource "aws_subnet" "db_sn" {
+  vpc_id = aws_vpc.main.id
+  cidr_block = var.db_subnet
+  availability_zone = var.availability_zone[2]
+  tags = {
+    "Name" = "db Subnet"
+  }
+}
+
+resource "aws_subnet" "frontend_sn" {
+  vpc_id = aws_vpc.main.id
+  cidr_block = var.fe_subnet
+  availability_zone = var.availability_zone[3]
+  tags = {
+    "Name" = "frontend Subnet"
+  }
+}
+
+resource "aws_db_subnet_group" "db-subnet" {
+  name       = "db_subnet_group"
+  subnet_ids = ["${aws_subnet.db_sn.id}", "${aws_subnet.web_sn.id}"]
+}
+
 
 resource "aws_internet_gateway" "my_web_igw" {
   vpc_id = aws_vpc.main.id
@@ -96,6 +119,25 @@ data "aws_ami" "latest_amazon_linux2"{
   }
 }
 
+data "aws_secretsmanager_secret_version" "creds" {
+  secret_id = "db_creds"
+}
+
+locals {
+  db_creds = jsondecode(data.aws_secretsmanager_secret_version.creds.secret_string)
+}
+
+resource "aws_db_instance" "default" {
+  allocated_storage = 10
+  engine =  "mysql"
+  engine_version = "8.0.27"
+  instance_class = "db.t3.micro"
+  db_name = "mydb"
+  username = local.db_creds.username
+  password = local.db_creds.password
+  skip_final_snapshot = true
+  db_subnet_group_name = "${aws_db_subnet_group.db-subnet.name}"
+}
 # Spinning up an EC2 Instance
 resource "aws_instance" "test_vm" {
   ami = data.aws_ami.latest_amazon_linux2.id
@@ -104,7 +146,7 @@ resource "aws_instance" "test_vm" {
   associate_public_ip_address = var.test_instance[2]
   user_data = file(".\\entry_script.sh") # running the script on the EC2 instance at boot
 
-  subnet_id = aws_subnet.web.id
+  subnet_id = aws_subnet.web_sn.id
   vpc_security_group_ids = [aws_default_security_group.default_sg.id]
   key_name = "testing_ssh_key"
 
@@ -122,7 +164,7 @@ resource "aws_instance" "prod_vm" {
   associate_public_ip_address = var.prod_instance[2]
   user_data = file(".\\entry_script.sh") # running the script on the EC2 instance at boot
 
-  subnet_id = aws_subnet.web.id
+  subnet_id = aws_subnet.web_sn.id
   vpc_security_group_ids = [aws_default_security_group.default_sg.id]
   key_name = "testing_ssh_key"
 

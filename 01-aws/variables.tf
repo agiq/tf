@@ -10,6 +10,17 @@ variable "web_subnet" {
     type = string
 }
 
+variable "db_subnet" {
+    # default = "10.0.10.0/24"
+    description = "db Subnet"
+    type = string
+}
+
+variable "fe_subnet" {
+    # default = "10.0.10.0/24"
+    description = "FE Subnet"
+    type = string
+}
 variable "subnet_zone" {
   
 }
