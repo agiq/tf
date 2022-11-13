@@ -1,5 +1,4 @@
-.terraform
-**/logs
+### Terraform ###
 # Local .terraform directories
 **/.terraform/*
 
